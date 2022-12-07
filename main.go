@@ -101,6 +101,11 @@ func (d Download) Do() error {
 
 	wg.Wait()
 
+	err = d.mergeSections(sections)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -141,4 +146,40 @@ func (d Download) downloadSection(i int, s [2]int) error {
 	}
 
 	return nil
+}
+
+func (d Download) mergeSections(sections [][2]int) error {
+
+	f, err := os.OpenFile(d.TargetPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	for i := range sections {
+		b, err := ioutil.ReadFile(fmt.Sprintf("section-%v.tmp", i))
+		if err != nil {
+			return err
+		}
+		n, err := f.Write(b)
+
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Escritos %v bytes en el archivo final\n", n)
+	}
+
+	// d.clean()
+
+	return nil
+}
+
+// El código es bastante simple, lo que hace es dividir el archivo en secciones y descargar cada una de ellas en un hilo diferente. Una vez que todas las secciones han sido descargadas, se unen en un archivo final.
+
+// Funcion para limpiar todos los archivos temporales
+func (d Download) clean() {
+	for i := 0; i < d.TotalSections; i++ {
+		os.Remove(fmt.Sprintf("section-%v.tmp", i))
+	}
 }
