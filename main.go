@@ -3,8 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -79,12 +82,24 @@ func (d Download) Do() error {
 
 	fmt.Println(sections)
 
+	var wg sync.WaitGroup
+
 	for i, s := range sections {
-		err := d.downloadSection(i, s)
-		if err != nil {
-			return err
-		}
+		wg.Add(1)
+
+		// Se crea una copia de las variables i y s para que no se sobreescriban
+		i := i
+		s := s
+		go func() {
+			defer wg.Done()
+			err := d.downloadSection(i, s)
+			if err != nil {
+				panic(err)
+			}
+		}()
 	}
+
+	wg.Wait()
 
 	return nil
 }
@@ -115,5 +130,15 @@ func (d Download) downloadSection(i int, s [2]int) error {
 		return err
 	}
 	fmt.Printf("Descargado %v bytes de la sección %v: %v\n", resp.Header.Get("Content-Length"), i, s)
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	e := ioutil.WriteFile(fmt.Sprintf("section-%v.tmp", i), b, os.ModePerm)
+	if e != nil {
+		return err
+	}
+
 	return nil
 }
